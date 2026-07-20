@@ -6,19 +6,27 @@ import {
 } from './config-toml-line-scan'
 
 const ORCA_DISABLED_BROWSER_TABLES = [
-  '[mcp_servers.node_repl]',
-  '[plugins."browser@openai-bundled"]'
+  { header: '[mcp_servers.node_repl]', path: ['mcp_servers', 'node_repl'] },
+  {
+    header: '[plugins."browser@openai-bundled"]',
+    path: ['plugins', 'browser@openai-bundled']
+  }
 ] as const
 
 export function applyOrcaBrowserRoutingConfig(config: string): string {
   return ORCA_DISABLED_BROWSER_TABLES.reduce(forceTomlTableDisabled, config)
 }
 
-function forceTomlTableDisabled(config: string, targetHeader: string): string {
+function forceTomlTableDisabled(
+  config: string,
+  target: (typeof ORCA_DISABLED_BROWSER_TABLES)[number]
+): string {
   const lines = config.split('\n')
-  const sections = findTomlSections(lines).filter((section) => section.header === targetHeader)
+  const sections = findTomlSections(lines).filter((section) =>
+    tomlTablePathEquals(section.header, target.path)
+  )
   if (sections.length === 0) {
-    return appendDisabledTomlTable(config, targetHeader)
+    return appendDisabledTomlTable(config, target.header)
   }
 
   for (const section of sections.toReversed()) {
@@ -69,8 +77,90 @@ function findEnabledLine(lines: readonly string[], start: number, end: number): 
 }
 
 function replaceEnabledValue(line: string): string {
-  const match = /^([ \t]*)enabled[ \t]*=.*?([ \t]+#.*)?(\r?)$/.exec(line)
+  const match = /^([ \t]*)enabled[ \t]*=[ \t]*(?:true|false)([ \t]*#.*)?(\r?)$/.exec(line)
   return match ? `${match[1]}enabled = false${match[2] ?? ''}${match[3]}` : line
+}
+
+function tomlTablePathEquals(header: string, targetPath: readonly string[]): boolean {
+  const parsedPath = parseTomlTablePath(header)
+  return (
+    parsedPath?.length === targetPath.length &&
+    parsedPath.every((segment, index) => segment === targetPath[index])
+  )
+}
+
+function parseTomlTablePath(header: string): string[] | null {
+  const trimmed = header.trim()
+  if (!trimmed.startsWith('[') || trimmed.startsWith('[[') || !trimmed.endsWith(']')) {
+    return null
+  }
+  const inner = trimmed.slice(1, -1)
+  const path: string[] = []
+  let index = 0
+
+  while (index < inner.length) {
+    index = skipWhitespace(inner, index)
+    const parsedKey = parseTomlKey(inner, index)
+    if (!parsedKey) {
+      return null
+    }
+    path.push(parsedKey.value)
+    index = skipWhitespace(inner, parsedKey.nextIndex)
+    if (index === inner.length) {
+      return path
+    }
+    if (inner[index] !== '.') {
+      return null
+    }
+    index += 1
+  }
+  return null
+}
+
+function parseTomlKey(
+  input: string,
+  startIndex: number
+): { value: string; nextIndex: number } | null {
+  const quote = input[startIndex]
+  if (quote === "'") {
+    const endIndex = input.indexOf("'", startIndex + 1)
+    return endIndex === -1
+      ? null
+      : { value: input.slice(startIndex + 1, endIndex), nextIndex: endIndex + 1 }
+  }
+  if (quote === '"') {
+    let index = startIndex + 1
+    let value = ''
+    while (index < input.length) {
+      const char = input[index]
+      if (char === '"') {
+        return { value, nextIndex: index + 1 }
+      }
+      if (char === '\\') {
+        const escaped = input[index + 1]
+        if (escaped !== '"' && escaped !== '\\') {
+          return null
+        }
+        value += escaped
+        index += 2
+        continue
+      }
+      value += char
+      index += 1
+    }
+    return null
+  }
+
+  const match = /^[A-Za-z0-9_-]+/.exec(input.slice(startIndex))
+  return match ? { value: match[0], nextIndex: startIndex + match[0].length } : null
+}
+
+function skipWhitespace(input: string, startIndex: number): number {
+  let index = startIndex
+  while (input[index] === ' ' || input[index] === '\t') {
+    index += 1
+  }
+  return index
 }
 
 function appendDisabledTomlTable(config: string, targetHeader: string): string {

@@ -144,6 +144,28 @@ describe('syncSystemConfigIntoManagedCodexHome', () => {
     expect(runtimeConfig).toContain('[plugins."browser@openai-bundled"]\nenabled = false')
   })
 
+  it('matches equivalent quoted table names and preserves adjacent comments', () => {
+    const systemConfig = [
+      '[mcp_servers.node_repl]',
+      'enabled=true# keep node explanation',
+      '',
+      "[plugins.'browser@openai-bundled']",
+      'enabled=true# keep plugin explanation',
+      ''
+    ].join('\n')
+    writeFileSync(getSystemConfigPath(), systemConfig, 'utf-8')
+
+    syncSystemConfigIntoManagedCodexHome()
+
+    const runtimeConfig = readFileSync(getRuntimeConfigPath(), 'utf-8')
+    expect(runtimeConfig).toContain('enabled = false# keep node explanation')
+    expect(runtimeConfig).toContain(
+      "[plugins.'browser@openai-bundled']\nenabled = false# keep plugin explanation"
+    )
+    expect(runtimeConfig).not.toContain('[plugins."browser@openai-bundled"]')
+    expect(readFileSync(getSystemConfigPath(), 'utf-8')).toBe(systemConfig)
+  })
+
   it('preserves system-home relative path references in the runtime config copy', () => {
     writeFileSync(
       getSystemConfigPath(),
