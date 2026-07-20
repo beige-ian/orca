@@ -177,7 +177,7 @@ export const BROWSER_BASIC_COMMAND_SPECS: CommandSpec[] = [
   },
   {
     path: ['tab', 'create'],
-    summary: 'Create a new browser tab in the current worktree',
+    summary: 'Create a new browser tab in the selected workspace',
     usage: 'orca tab create [--url <url>] [--worktree <selector>] [--profile <id>] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'url', 'worktree', 'profile']
   },

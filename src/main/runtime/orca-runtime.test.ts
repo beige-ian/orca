@@ -4333,7 +4333,8 @@ describe('OrcaRuntimeService', () => {
       expect(spawn).toHaveBeenCalledWith(
         expect.objectContaining({
           cwd: '/remote/agent-feature',
-          command: "codex '--dangerously-bypass-approvals-and-sandbox' 'hi'",
+          command:
+            "codex '--dangerously-bypass-approvals-and-sandbox' -c 'plugins.\"browser@openai-bundled\".enabled=false' 'hi'",
           worktreeId: result.worktree.id
         })
       )
@@ -4444,7 +4445,8 @@ describe('OrcaRuntimeService', () => {
       expect(spawn).toHaveBeenCalledWith(
         expect.objectContaining({
           cwd: 'C:/remote/agent-feature',
-          command: "codex '--dangerously-bypass-approvals-and-sandbox' 'fix Bob''s branch'"
+          command:
+            "codex '--dangerously-bypass-approvals-and-sandbox' -c 'plugins.\"browser@openai-bundled\".enabled=false' 'fix Bob''s branch'"
         })
       )
       expect(addWorktree).not.toHaveBeenCalled()
@@ -9775,7 +9777,9 @@ describe('OrcaRuntimeService', () => {
     const spawnCall = spawn.mock.calls[0]?.[0] as
       | { command?: string; env?: Record<string, string> }
       | undefined
-    expect(spawnCall?.command).toBe("codex '--dangerously-bypass-approvals-and-sandbox'")
+    expect(spawnCall?.command).toBe(
+      "codex '--dangerously-bypass-approvals-and-sandbox' -c 'plugins.\"browser@openai-bundled\".enabled=false'"
+    )
     expect(spawnCall?.env).toMatchObject({
       CODEX_PROFILE: 'captured',
       ORCA_WORKTREE_ID: TEST_WORKTREE_ID
@@ -9901,7 +9905,7 @@ describe('OrcaRuntimeService', () => {
 
     const spawnCall = spawn.mock.calls[0]?.[0] as { command?: string } | undefined
     expect(spawnCall?.command).toBe(
-      "codex --profile work '--dangerously-bypass-approvals-and-sandbox'"
+      "codex --profile work '--dangerously-bypass-approvals-and-sandbox' -c 'plugins.\"browser@openai-bundled\".enabled=false'"
     )
   })
 
@@ -10017,11 +10021,13 @@ describe('OrcaRuntimeService', () => {
       'terminal:requestTabCreate',
       expect.objectContaining({
         worktreeId: TEST_WORKTREE_ID,
-        command: "codex '--dangerously-bypass-approvals-and-sandbox'",
+        command:
+          "codex '--dangerously-bypass-approvals-and-sandbox' -c 'plugins.\"browser@openai-bundled\".enabled=false'",
         env: { CODEX_PROFILE: 'captured' },
         launchAgent: 'codex',
         launchConfig: {
-          agentCommand: "codex '--dangerously-bypass-approvals-and-sandbox'",
+          agentCommand:
+            "codex '--dangerously-bypass-approvals-and-sandbox' -c 'plugins.\"browser@openai-bundled\".enabled=false'",
           agentArgs: '--dangerously-bypass-approvals-and-sandbox',
           agentEnv: { CODEX_PROFILE: 'captured' }
         }
@@ -10248,7 +10254,9 @@ describe('OrcaRuntimeService', () => {
     expect(compoundClaude.env?.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS).toBeUndefined()
     expect(compoundClaude.env?.TMUX).toBeUndefined()
 
-    expect(normalAgent.command).toBe("codex '--dangerously-bypass-approvals-and-sandbox'")
+    expect(normalAgent.command).toBe(
+      "codex '--dangerously-bypass-approvals-and-sandbox' -c 'plugins.\"browser@openai-bundled\".enabled=false'"
+    )
     expect(normalAgent.env?.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS).toBeUndefined()
     expect(normalAgent.env?.TMUX).toBeUndefined()
   })
@@ -10635,7 +10643,8 @@ describe('OrcaRuntimeService', () => {
     })
     expect(spawn).toHaveBeenCalledWith(
       expect.objectContaining({
-        command: "codex '--dangerously-bypass-approvals-and-sandbox'",
+        command:
+          "codex '--dangerously-bypass-approvals-and-sandbox' -c 'plugins.\"browser@openai-bundled\".enabled=false'",
         cwd: TEST_WORKTREE_PATH,
         worktreeId: TEST_WORKTREE_ID
       })
@@ -10704,7 +10713,8 @@ describe('OrcaRuntimeService', () => {
       expect.objectContaining({
         requestId: expect.any(String),
         worktreeId: TEST_WORKTREE_ID,
-        command: "codex '--dangerously-bypass-approvals-and-sandbox'",
+        command:
+          "codex '--dangerously-bypass-approvals-and-sandbox' -c 'plugins.\"browser@openai-bundled\".enabled=false'",
         title: 'Renderer Terminal'
       })
     )
@@ -26852,7 +26862,8 @@ describe('OrcaRuntimeService', () => {
     expect(spawn).toHaveBeenCalledWith(
       expect.objectContaining({
         cwd: '/tmp/workspaces/runtime-startup-draft',
-        command: "codex --profile work '--dangerously-bypass-approvals-and-sandbox'",
+        command:
+          "codex --profile work '--dangerously-bypass-approvals-and-sandbox' -c 'plugins.\"browser@openai-bundled\".enabled=false'",
         worktreeId: result.worktree.id
       })
     )
@@ -26955,7 +26966,8 @@ describe('OrcaRuntimeService', () => {
     expect(spawn).toHaveBeenCalledWith(
       expect.objectContaining({
         cwd: '/tmp/workspaces/runtime-cli-agent-startup',
-        command: "codex '--dangerously-bypass-approvals-and-sandbox' 'hi'",
+        command:
+          "codex '--dangerously-bypass-approvals-and-sandbox' -c 'plugins.\"browser@openai-bundled\".enabled=false' 'hi'",
         worktreeId: result.worktree.id
       })
     )
@@ -27450,7 +27462,8 @@ describe('OrcaRuntimeService', () => {
     expect(spawn).toHaveBeenCalledWith(
       expect.objectContaining({
         cwd: '/tmp/workspaces/runtime-explicit-draft',
-        command: "codex '--dangerously-bypass-approvals-and-sandbox'",
+        command:
+          "codex '--dangerously-bypass-approvals-and-sandbox' -c 'plugins.\"browser@openai-bundled\".enabled=false'",
         worktreeId: result.worktree.id
       })
     )
@@ -27734,7 +27747,8 @@ describe('OrcaRuntimeService', () => {
       expect(spawn).toHaveBeenCalledWith(
         expect.objectContaining({
           cwd: '/remote/mobile-codex-draft',
-          command: "codex '--dangerously-bypass-approvals-and-sandbox'",
+          command:
+            "codex '--dangerously-bypass-approvals-and-sandbox' -c 'plugins.\"browser@openai-bundled\".enabled=false'",
           connectionId: 'ssh-1',
           worktreeId: result.worktree.id
         })
@@ -30930,6 +30944,22 @@ describe('OrcaRuntimeService', () => {
         })
       ).rejects.toThrow('selector_not_found')
       expect(tabListMock).not.toHaveBeenCalled()
+    })
+
+    it('routes browser commands to the exact folder workspace selector', async () => {
+      mockLiveBrowserGuest()
+      const runtime = new OrcaRuntimeService(createFolderWorkspaceRuntimeStore())
+      const tabListMock = vi.fn(() => ({ tabs: [] }))
+
+      runtime.setAgentBrowserBridge({
+        tabList: tabListMock,
+        getRegisteredTabs: vi.fn(() => new Map([['page-1', 1]]))
+      } as never)
+
+      await expect(
+        runtime.browserTabList({ worktree: TEST_FOLDER_WORKSPACE_KEY })
+      ).resolves.toEqual({ tabs: [] })
+      expect(tabListMock).toHaveBeenCalledWith(TEST_FOLDER_WORKSPACE_KEY)
     })
 
     it('rejects closing an unknown page id instead of treating it as success', async () => {

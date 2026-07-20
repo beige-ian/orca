@@ -301,7 +301,7 @@ Browser Options:
   --to <ref>                Drag target element ref
   --files <path,...>        Comma-separated file paths for upload
   --timeout <ms>            Wait timeout in milliseconds
-  --worktree <selector>     Scope commands to a specific worktree's browser tabs
+  --worktree <selector>     Scope commands to a worktree or folder workspace (folder:<id>)
 
 Examples:
   $ orca open

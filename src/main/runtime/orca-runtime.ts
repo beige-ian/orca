@@ -19984,6 +19984,21 @@ export class OrcaRuntimeService {
     throw new Error('selector_not_found')
   }
 
+  private async resolveBrowserWorkspaceSelector(selector: string): Promise<{ id: string }> {
+    const rawSelector = selector.startsWith('id:') ? selector.slice('id:'.length) : selector
+    const parsed = parseWorkspaceKey(rawSelector)
+    if (parsed?.type === 'folder') {
+      const folderWorkspace = this.store
+        ?.getFolderWorkspaces?.()
+        .find((workspace) => workspace.id === parsed.folderWorkspaceId)
+      if (!folderWorkspace) {
+        throw new Error('selector_not_found')
+      }
+      return { id: folderWorkspaceKey(folderWorkspace.id) }
+    }
+    return await this.resolveWorktreeSelector(selector)
+  }
+
   private async resolveWorkspaceParentSelector(selector: string): Promise<ResolvedWorkspaceParent> {
     const rawSelector = selector.startsWith('id:') ? selector.slice('id:'.length) : selector
     const parsed = parseWorkspaceKey(rawSelector)
@@ -25003,7 +25018,7 @@ export class OrcaRuntimeService {
 
   private readonly browserCommands = new RuntimeBrowserCommands({
     getAgentBrowserBridge: () => this.agentBrowserBridge,
-    resolveWorktreeSelector: (selector) => this.resolveWorktreeSelector(selector),
+    resolveBrowserWorkspaceSelector: (selector) => this.resolveBrowserWorkspaceSelector(selector),
     getAuthoritativeWindow: () => this.getAuthoritativeWindow(),
     getAvailableAuthoritativeWindow: () => this.getAvailableAuthoritativeWindow(),
     getOffscreenBrowserBackend: () => this.offscreenBrowserBackend,

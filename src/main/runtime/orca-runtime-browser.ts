@@ -140,7 +140,7 @@ function clampOptionalNumber(
 
 export type RuntimeBrowserCommandHost = {
   getAgentBrowserBridge(): AgentBrowserBridge | null
-  resolveWorktreeSelector(selector: string): Promise<{ id: string }>
+  resolveBrowserWorkspaceSelector(selector: string): Promise<{ id: string }>
   getAuthoritativeWindow(): BrowserWindow
   getAvailableAuthoritativeWindow(): BrowserWindow | null
   // Why: headless serve has no renderer window; browser pages are backed by a
@@ -220,7 +220,7 @@ export class RuntimeBrowserCommands {
       return undefined
     }
 
-    const worktreeId = (await this.host.resolveWorktreeSelector(selector)).id
+    const worktreeId = (await this.host.resolveBrowserWorkspaceSelector(selector)).id
     // Why: explicit worktree selectors are user intent, so resolution errors
     // must surface instead of silently widening browser routing scope. Only the
     // activation step remains best-effort because missing windows during tests
@@ -249,7 +249,7 @@ export class RuntimeBrowserCommands {
     }
 
     const worktreeId = params.worktree
-      ? (await this.host.resolveWorktreeSelector(params.worktree)).id
+      ? (await this.host.resolveBrowserWorkspaceSelector(params.worktree)).id
       : undefined
     const bridge = this.host.getAgentBrowserBridge()
     if (bridge && !this.hasLiveRegisteredBrowserPage(bridge, worktreeId, browserPageId)) {
@@ -1333,7 +1333,7 @@ export class RuntimeBrowserCommands {
   }): Promise<{ browserPageId: string }> {
     const url = params.url ?? 'about:blank'
     const worktreeId = params.worktree
-      ? (await this.host.resolveWorktreeSelector(params.worktree)).id
+      ? (await this.host.resolveBrowserWorkspaceSelector(params.worktree)).id
       : undefined
     const sessionPartition = browserSessionRegistry.resolveKnownPartition(params.profileId)
     if (!sessionPartition) {
