@@ -133,9 +133,7 @@ describe('tui agent startup plans', () => {
       platform: 'linux'
     })
 
-    expect(plan?.launchCommand).toBe(
-      "codex -c 'plugins.\"browser@openai-bundled\".enabled=false' '--version'"
-    )
+    expect(plan?.launchCommand).toBe("codex '--version'")
   })
 
   it.each([
@@ -417,9 +415,7 @@ describe('tui agent startup plans', () => {
       platform: 'linux'
     })
 
-    expect(plan?.launchCommand).toBe(
-      "codex -c 'plugins.\"browser@openai-bundled\".enabled=false' 'fix it'"
-    )
+    expect(plan?.launchCommand).toBe("codex 'fix it'")
     expect(plan?.startupCommandDelivery).toBe('shell-ready')
   })
 
@@ -434,14 +430,10 @@ describe('tui agent startup plans', () => {
 
     expect(plan).toEqual({
       agent: 'codex',
-      launchCommand: 'codex -c \'plugins."browser@openai-bundled".enabled=false\'',
+      launchCommand: 'codex',
       expectedProcess: 'codex',
       followupPrompt: null,
-      launchConfig: {
-        agentCommand: 'codex -c \'plugins."browser@openai-bundled".enabled=false\'',
-        agentArgs: '',
-        agentEnv: {}
-      }
+      launchConfig: { agentCommand: 'codex', agentArgs: '', agentEnv: {} }
     })
   })
 
@@ -579,7 +571,7 @@ describe('tui agent startup plans', () => {
     expect(plan?.launchCommand).toBe("claude --dangerously-skip-permissions 'fix it'")
   })
 
-  it('preserves Codex command overrides while enforcing the Orca browser route', () => {
+  it('leaves Codex command overrides untouched', () => {
     const plan = buildAgentStartupPlan({
       agent: 'codex',
       prompt: 'fix it',
@@ -587,9 +579,7 @@ describe('tui agent startup plans', () => {
       platform: 'linux'
     })
 
-    expect(plan?.launchCommand).toBe(
-      "codex --profile work -c 'plugins.\"browser@openai-bundled\".enabled=false' 'fix it'"
-    )
+    expect(plan?.launchCommand).toBe("codex --profile work 'fix it'")
   })
 
   it('builds Windows resume plans that PowerShell can invoke', () => {
@@ -600,9 +590,7 @@ describe('tui agent startup plans', () => {
       platform: 'win32'
     })
 
-    expect(plan?.launchCommand).toBe(
-      "codex -c 'plugins.\"browser@openai-bundled\".enabled=false' 'resume' 's1'"
-    )
+    expect(plan?.launchCommand).toBe("codex 'resume' 's1'")
   })
 
   it('honors command overrides when building POSIX resume plans', () => {
@@ -613,9 +601,7 @@ describe('tui agent startup plans', () => {
       platform: 'linux'
     })
 
-    expect(plan?.launchCommand).toBe(
-      "codex --profile work -c 'plugins.\"browser@openai-bundled\".enabled=false' 'resume' 's1'"
-    )
+    expect(plan?.launchCommand).toBe("codex --profile work 'resume' 's1'")
   })
 
   it('uses a captured launch command when building resume plans after overrides change', () => {
@@ -627,12 +613,9 @@ describe('tui agent startup plans', () => {
       platform: 'linux'
     })
 
-    expect(plan?.launchCommand).toBe(
-      "codex --profile captured -c 'plugins.\"browser@openai-bundled\".enabled=false' 'resume' 's1'"
-    )
+    expect(plan?.launchCommand).toBe("codex --profile captured 'resume' 's1'")
     expect(plan?.launchConfig).toEqual({
-      agentCommand:
-        'codex --profile captured -c \'plugins."browser@openai-bundled".enabled=false\'',
+      agentCommand: 'codex --profile captured',
       agentArgs: '',
       agentEnv: {}
     })

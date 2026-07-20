@@ -4,6 +4,7 @@ import { writeFileAtomically } from '../codex-accounts/fs-utils'
 import { getOrcaManagedCodexHomePath, getSystemCodexHomePath } from './codex-home-paths'
 import { rewriteRelativePathConfigValues } from './codex-config-path-reference-rewrite'
 import { parseWslUncPath } from '../../shared/wsl-paths'
+import { applyOrcaBrowserRoutingConfig } from './codex-browser-routing-config'
 import {
   promoteCodexRuntimeSettingsToSystem,
   snapshotCodexRuntimeSettingsBaseline,
@@ -81,9 +82,11 @@ export function resolveCodexConfigMirrorSourceDirectory(systemHomePath: string):
 }
 
 function prepareSystemConfigForRuntimeMirror(config: string, systemConfigDir: string): string {
-  return rewriteRelativePathConfigValues(
-    normalizeDeprecatedCodexHookFeatureFlag(config),
-    systemConfigDir
+  return applyOrcaBrowserRoutingConfig(
+    rewriteRelativePathConfigValues(
+      normalizeDeprecatedCodexHookFeatureFlag(config),
+      systemConfigDir
+    )
   )
 }
 

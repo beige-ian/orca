@@ -112,6 +112,38 @@ describe('syncSystemConfigIntoManagedCodexHome', () => {
     expect(readFileSync(getSystemConfigPath(), 'utf-8')).toContain('codex_hooks = true')
   })
 
+  it('disables the conflicting Browser plugin only in Orca runtime config', () => {
+    const systemConfig = [
+      '[mcp_servers.node_repl]',
+      'command = "node_repl"',
+      'enabled = true',
+      '',
+      '[plugins."browser@openai-bundled"]',
+      'enabled = true',
+      ''
+    ].join('\n')
+    writeFileSync(getSystemConfigPath(), systemConfig, 'utf-8')
+
+    syncSystemConfigIntoManagedCodexHome()
+
+    const runtimeConfig = readFileSync(getRuntimeConfigPath(), 'utf-8')
+    expect(runtimeConfig).toContain(
+      '[mcp_servers.node_repl]\ncommand = "node_repl"\nenabled = false'
+    )
+    expect(runtimeConfig).toContain('[plugins."browser@openai-bundled"]\nenabled = false')
+    expect(readFileSync(getSystemConfigPath(), 'utf-8')).toBe(systemConfig)
+  })
+
+  it('adds missing Browser routing disable sections to Orca runtime config', () => {
+    writeFileSync(getSystemConfigPath(), 'model = "system-model"\n', 'utf-8')
+
+    syncSystemConfigIntoManagedCodexHome()
+
+    const runtimeConfig = readFileSync(getRuntimeConfigPath(), 'utf-8')
+    expect(runtimeConfig).toContain('[mcp_servers.node_repl]\nenabled = false')
+    expect(runtimeConfig).toContain('[plugins."browser@openai-bundled"]\nenabled = false')
+  })
+
   it('preserves system-home relative path references in the runtime config copy', () => {
     writeFileSync(
       getSystemConfigPath(),
