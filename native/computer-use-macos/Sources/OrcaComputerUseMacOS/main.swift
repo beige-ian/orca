@@ -3808,6 +3808,7 @@ if arguments.first == "--agent" {
         exit(2)
     }
     writePermissionStatus(to: arguments[1])
+    exit(0)
 } else {
     runStdio()
 }

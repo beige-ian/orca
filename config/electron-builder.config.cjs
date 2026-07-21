@@ -11,6 +11,10 @@ const {
   prunePackagedRuntimeNodeModules,
   verifyPackagedMainRuntimeDeps
 } = require('./packaged-runtime-node-modules.cjs')
+const {
+  resolvePackagedComputerUseBuildIdentity,
+  writeComputerUseBuildIdentity
+} = require('./scripts/computer-use-build-identity.cjs')
 
 const isMacRelease = process.env.ORCA_MAC_RELEASE === '1'
 const isLinuxArm64Release = process.env.ORCA_LINUX_ARM64_RELEASE === '1'
@@ -437,6 +441,14 @@ async function signMacComputerUseHelper(helperAppPath, packager) {
     }
     return
   }
+  // Why: different signing identities need distinct bundle ids so their TCC grants cannot collide.
+  writeComputerUseBuildIdentity(
+    helperAppPath,
+    resolvePackagedComputerUseBuildIdentity({
+      isRelease: isMacRelease,
+      bundleIdOverride: process.env.ORCA_COMPUTER_MACOS_BUNDLE_ID
+    })
+  )
   const codeSigningInfo =
     isMacRelease && process.env.CSC_LINK && packager?.codeSigningInfo?.value
       ? await packager.codeSigningInfo.value
