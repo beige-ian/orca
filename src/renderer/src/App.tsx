@@ -115,9 +115,14 @@ import {
 import { createSessionWriteSubscriber } from './lib/session-write-subscriber'
 import {
   fetchWorkspaceSessionWithRuntimeHostOwners,
-  patchWorkspaceSessionByHost,
-  persistWorkspaceSessionByHostSync
+  buildWorkspaceSessionHostSnapshots,
+  patchWorkspaceSessionByHost
 } from './lib/workspace-session-host-persistence'
+import { requestAgentStatusStartupSnapshot } from './lib/agent-status-startup-snapshot'
+import {
+  createShutdownCheckpointBeforeUnloadHandler,
+  createShutdownCheckpointGuard
+} from './lib/shutdown-checkpoint-guard'
 import { collectFolderWorkspaceKeysFromSession } from './lib/workspace-session-hydration-keys'
 import {
   getStartupErrorFallbackUI,
@@ -178,6 +183,11 @@ import {
   hasRequestedBackgroundTerminalWorktreeMount,
   subscribeBackgroundTerminalWorktreeMountRequests
 } from './components/terminal/background-terminal-worktree-mount'
+import {
+  ORCA_APP_RESTART_ABORTED_EVENT,
+  ORCA_UPDATER_QUIT_AND_INSTALL_ABORTED_EVENT
+} from '../../shared/updater-renderer-events'
+import { ORCA_RENDERER_UNLOAD_PREVENTED_EVENT } from '../../shared/renderer-shutdown-events'
 
 // Why: agents alive during a hard kill (crash, forced update install) need a
 // reasonably fresh resume record on disk; one minute bounds the lost window
@@ -1091,6 +1101,18 @@ function App(): React.JSX.Element {
           await timeRendererStartupStep('first-window-services-await', () =>
             window.api.app.awaitFirstWindowStartupServices()
           )
+          // Why: the main hook cache survives an Electron crash, but the
+          // renderer must apply it before TerminalPane builds its cold-restore
+          // command. Waiting here removes the race where the pane mounts from
+          // the persisted layout before the post-ready snapshot IPC resolves.
+          await timeRendererStartupStep('agent-status-startup-snapshot', () =>
+            requestAgentStatusStartupSnapshot().catch((err) => {
+              // The normal post-ready snapshot subscriber remains as a
+              // fallback; hook continuity must not prevent the workspace from
+              // opening when the optional cache read fails.
+              console.warn('[agent-status] startup snapshot failed:', err)
+            })
+          )
           reconnectStarted = true
           await timeRendererStartupStep('reconnect-terminals', () =>
             actions.reconnectPersistedTerminals(abortController.signal)
@@ -1330,8 +1352,8 @@ function App(): React.JSX.Element {
     })
   }, [])
 
-  // On shutdown, capture terminal scrollback buffers and flush to disk.
-  // Runs synchronously in beforeunload: capture → Zustand set → sendSync → flush.
+  // On shutdown, capture terminal scrollback buffers and flush all session
+  // partitions through one synchronous main-process checkpoint.
   useEffect(() => {
     // Why: beforeunload fires twice during a manual quit — once from the
     // synthetic dispatch in the onWindowCloseRequested handler (captures
@@ -1340,39 +1362,40 @@ function App(): React.JSX.Element {
     // two firings, PTY exit events can arrive and unmount TerminalPanes,
     // emptying shutdownBufferCaptures. The guard prevents the second call
     // from overwriting the good session data with an empty snapshot.
-    let shutdownBuffersCaptured = false
-    const captureAndFlush = (): void => {
-      if (shutdownBuffersCaptured) {
-        return
-      }
-      if (!shouldPersistWorkspaceSession(useAppStore.getState())) {
-        return
-      }
-      for (const capture of shutdownBufferCaptures.values()) {
-        try {
-          capture({ includeLocalBuffers: false })
-        } catch {
-          // Don't let one pane's failure block the rest.
+    const shutdownCheckpoint = createShutdownCheckpointGuard(() => {
+      const shouldCaptureSession = shouldPersistWorkspaceSession(useAppStore.getState())
+      if (shouldCaptureSession) {
+        for (const capture of shutdownBufferCaptures.values()) {
+          try {
+            capture({ includeLocalBuffers: false })
+          } catch {
+            // Don't let one pane's failure block the rest.
+          }
         }
+        // Why: agent provider session ids live only in agentStatusByPaneKey,
+        // which is in-memory. Capture them before the durable checkpoint.
+        useAppStore.getState().captureAllSleepingAgentSessions()
       }
-      // Why: agent provider session ids live only in agentStatusByPaneKey,
-      // which is in-memory. Capture them into the persisted sleeping-session
-      // map so a daemon/session death while the app is closed can still
-      // cold-restore via the agent's resume command (#5232).
-      useAppStore.getState().captureAllSleepingAgentSessions()
-      // Why: re-read state after capture() calls populated scrollback buffers
-      // into the store via Zustand setters. The earlier read is only for the
-      // gating flags and would miss those updates.
       const freshState = useAppStore.getState()
-      persistWorkspaceSessionByHostSync(
-        window.api.session,
-        buildWorkspaceSessionPayload(freshState),
-        freshState
+      const sessions = shouldCaptureSession
+        ? buildWorkspaceSessionHostSnapshots(buildWorkspaceSessionPayload(freshState), freshState)
+        : []
+      window.api.app.persistBeforeUnloadSync({ sessions })
+    })
+    const persistBeforeUnload = createShutdownCheckpointBeforeUnloadHandler(shutdownCheckpoint)
+    window.addEventListener('beforeunload', persistBeforeUnload)
+    window.addEventListener(ORCA_RENDERER_UNLOAD_PREVENTED_EVENT, shutdownCheckpoint.reset)
+    window.addEventListener(ORCA_APP_RESTART_ABORTED_EVENT, shutdownCheckpoint.reset)
+    window.addEventListener(ORCA_UPDATER_QUIT_AND_INSTALL_ABORTED_EVENT, shutdownCheckpoint.reset)
+    return () => {
+      window.removeEventListener('beforeunload', persistBeforeUnload)
+      window.removeEventListener(ORCA_RENDERER_UNLOAD_PREVENTED_EVENT, shutdownCheckpoint.reset)
+      window.removeEventListener(ORCA_APP_RESTART_ABORTED_EVENT, shutdownCheckpoint.reset)
+      window.removeEventListener(
+        ORCA_UPDATER_QUIT_AND_INSTALL_ABORTED_EVENT,
+        shutdownCheckpoint.reset
       )
-      shutdownBuffersCaptured = true
     }
-    window.addEventListener('beforeunload', captureAndFlush)
-    return () => window.removeEventListener('beforeunload', captureAndFlush)
   }, [])
 
   // Why: beforeunload never fires on a hard kill (crash, forced update

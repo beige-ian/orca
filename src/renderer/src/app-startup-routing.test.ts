@@ -72,6 +72,15 @@ describe('renderer startup runtime routing', () => {
     expect(servicesIndex).toBeLessThan(reconnectIndex)
   })
 
+  it('resets the shutdown checkpoint when a dirty editor cancels unload', () => {
+    const source = readFileSync(join(process.cwd(), 'src/renderer/src/App.tsx'), 'utf8')
+
+    expect(source).toContain('ORCA_RENDERER_UNLOAD_PREVENTED_EVENT')
+    expect(source).toContain(
+      'window.addEventListener(ORCA_RENDERER_UNLOAD_PREVENTED_EVENT, shutdownCheckpoint.reset)'
+    )
+  })
+
   it('does not eagerly import the floating terminal panel on startup', () => {
     const source = readFileSync(join(process.cwd(), 'src/renderer/src/App.tsx'), 'utf8')
 

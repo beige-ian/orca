@@ -5956,6 +5956,63 @@ describe('Last-status persistence', () => {
     }
   })
 
+  it('synchronously checkpoints resumable provider sessions before the debounce window', async () => {
+    const server = new AgentHookServer()
+    await server.start({
+      env: 'production',
+      userDataPath
+    })
+    try {
+      await postHookEvent(
+        server,
+        buildBody(
+          {
+            hook_event_name: 'UserPromptSubmit',
+            prompt: 'survive an abrupt Orca exit',
+            session_id: 'codex-live-checkpoint-session'
+          },
+          { paneKey: PANE, tabId: 'tab-1' }
+        ),
+        '/hook/codex'
+      )
+
+      expect(existsSync(lastStatusPath())).toBe(true)
+      expect(JSON.parse(readFileSync(lastStatusPath(), 'utf8')).entries[PANE]).toMatchObject({
+        providerSession: {
+          key: 'session_id',
+          id: 'codex-live-checkpoint-session'
+        },
+        payload: {
+          state: 'working',
+          prompt: 'survive an abrupt Orca exit'
+        }
+      })
+
+      await postHookEvent(
+        server,
+        buildBody(
+          {
+            hook_event_name: 'Stop',
+            session_id: 'codex-live-checkpoint-session',
+            last_assistant_message: 'done'
+          },
+          { paneKey: PANE, tabId: 'tab-1' }
+        ),
+        '/hook/codex'
+      )
+
+      // Why: a kill immediately after Stop must not replay the previous
+      // working row and launch a duplicate resume command on the next boot.
+      expect(JSON.parse(readFileSync(lastStatusPath(), 'utf8')).entries[PANE]).toMatchObject({
+        payload: {
+          state: 'done'
+        }
+      })
+    } finally {
+      server.stop()
+    }
+  })
+
   it('does not write prompt interaction keys to last-status.json', async () => {
     const server = new AgentHookServer()
     await server.start({

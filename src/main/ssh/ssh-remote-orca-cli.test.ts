@@ -42,7 +42,7 @@ function createFakeChild(): FakeChild {
 }
 
 describe('runRemoteOrcaCli', () => {
-  function createRuntime() {
+  function createRuntime(terminalPaneKeys: Record<string, string> = {}) {
     const messages: {
       id: string
       from_handle: string
@@ -92,7 +92,7 @@ describe('runRemoteOrcaCli', () => {
         liveLeafCount: 1
       }),
       getOrchestrationDb: () => db,
-      getTerminalPaneKey: () => null,
+      getTerminalPaneKey: (handle: string) => terminalPaneKeys[handle] ?? null,
       deliverPendingMessagesForHandle: vi.fn(),
       notifyMessageArrived: vi.fn(),
       linearIssueContext: vi.fn(async (request: unknown) => ({
@@ -150,7 +150,7 @@ describe('runRemoteOrcaCli', () => {
   })
 
   it('forwards remote pane identity through the legacy orchestration fallback', async () => {
-    const { runtime, db } = createRuntime()
+    const { runtime, db } = createRuntime({ term_ssh: 'tab_ssh:leaf_ssh' })
 
     const result = await runRemoteOrcaCli(
       runtime,
@@ -175,6 +175,7 @@ describe('runRemoteOrcaCli', () => {
     const db = new OrchestrationDb(':memory:')
     const runtime = new OrcaRuntimeService()
     runtime.setOrchestrationDb(db)
+    vi.spyOn(runtime, 'getTerminalPaneKey').mockReturnValue('tab_foreign:leaf_foreign')
     vi.spyOn(runtime, 'deliverPendingMessagesForHandle').mockImplementation(() => {})
     vi.spyOn(runtime, 'notifyMessageArrived').mockImplementation(() => {})
     const task = db.createTask({ spec: 'remote work' })
@@ -223,6 +224,7 @@ describe('runRemoteOrcaCli', () => {
     const db = new OrchestrationDb(':memory:')
     const runtime = new OrcaRuntimeService()
     runtime.setOrchestrationDb(db)
+    vi.spyOn(runtime, 'getTerminalPaneKey').mockReturnValue('tab_owner:leaf_owner')
     vi.spyOn(runtime, 'deliverPendingMessagesForHandle').mockImplementation(() => {})
     vi.spyOn(runtime, 'notifyMessageArrived').mockImplementation(() => {})
     const task = db.createTask({ spec: 'remote work' })

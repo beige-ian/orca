@@ -34,6 +34,18 @@ function makeTerminalTab(id: string): Record<string, unknown> {
 }
 
 describe('resumeSleepingAgentSessionsForWorktree replay protection', () => {
+  it('does not auto-resume saved agent sessions during app startup', () => {
+    const record = makeRecord()
+    useAppStore.setState({
+      tabsByWorktree: { 'wt-1': [] },
+      sleepingAgentSessionsByPaneKey: { [record.paneKey]: record }
+    } as never)
+
+    expect(resumeSleepingAgentSessionsForWorktree('wt-1', { allowAutomaticResume: false })).toBe(0)
+    expect(useAppStore.getState().tabsByWorktree['wt-1']).toHaveLength(0)
+    expect(useAppStore.getState().sleepingAgentSessionsByPaneKey[record.paneKey]).toBe(record)
+  })
+
   it('stores provider-session metadata in the queued startup and runtime claim', () => {
     const record = makeRecord()
     useAppStore.setState({

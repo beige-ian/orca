@@ -41,6 +41,10 @@ async function runBuiltCli(
       ...process.env,
       ORCA_USER_DATA_PATH: userDataPath,
       ORCA_TERMINAL_HANDLE: 'term_cli',
+      // Why: the test process may itself run inside an Orca pane. Do not let
+      // that ambient caller identity leak into the isolated subprocess; the
+      // runtime fixture intentionally has no pane mapping for term_cli.
+      ORCA_PANE_KEY: '',
       ...extraEnv
     },
     stdio: ['ignore', 'pipe', 'pipe']

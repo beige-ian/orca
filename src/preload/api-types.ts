@@ -876,6 +876,10 @@ export type AppApi = {
   /** Restarts Orca through the normal quit pipeline so daemon-backed terminal
    *  sessions survive and can reattach after the new process starts. */
   restart: () => Promise<void>
+  /** Synchronously persists renderer-owned workspace sessions before unload. */
+  persistBeforeUnloadSync: (args: {
+    sessions: { state: WorkspaceSessionState; hostId?: ExecutionHostId }[]
+  }) => void
   /** Reloads the current app renderer through main so expected renderer
    *  teardown can be classified before Electron emits process-gone events. */
   reload: () => Promise<void>

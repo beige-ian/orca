@@ -181,15 +181,12 @@ import type {
   NativeChatReadSessionResult
 } from './api-types'
 import {
-  ORCA_EDITOR_PREPARE_HOT_EXIT_EVENT,
-  type EditorPrepareHotExitDetail
-} from '../shared/editor-save-events'
-import {
   ORCA_APP_RESTART_ABORTED_EVENT,
   ORCA_APP_RESTART_STARTED_EVENT,
   ORCA_UPDATER_QUIT_AND_INSTALL_ABORTED_EVENT,
   ORCA_UPDATER_QUIT_AND_INSTALL_STARTED_EVENT
 } from '../shared/updater-renderer-events'
+import { prepareRendererForAppRestart } from './renderer-restart-preparation'
 import {
   ORCA_INTERNAL_FILE_DRAG_TYPE,
   createNativeFileDropPayload,
@@ -242,54 +239,6 @@ function getLinuxDisplayServer(): 'wayland' | 'x11' | null {
     return 'wayland'
   }
   return process.env.DISPLAY ? 'x11' : null
-}
-
-type AppRestartPrepOptions = {
-  startedEventName: string
-  abortedEventName: string
-}
-
-function requestEditorHotExitBackup(): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    let claimed = false
-    window.dispatchEvent(
-      new CustomEvent<EditorPrepareHotExitDetail>(ORCA_EDITOR_PREPARE_HOT_EXIT_EVENT, {
-        detail: {
-          claim: () => {
-            claimed = true
-          },
-          resolve,
-          reject: (message) => {
-            reject(new Error(message))
-          }
-        }
-      })
-    )
-
-    // Why: restart paths can run before the editor autosave controller mounts.
-    // With no claimant, there are no renderer-owned dirty buffers to back up.
-    if (!claimed) {
-      resolve()
-    }
-  })
-}
-
-async function prepareRendererForAppRestart({
-  startedEventName,
-  abortedEventName
-}: AppRestartPrepOptions): Promise<void> {
-  window.dispatchEvent(new Event(startedEventName))
-
-  try {
-    await requestEditorHotExitBackup()
-  } catch (error) {
-    window.dispatchEvent(new Event(abortedEventName))
-    throw error
-  }
-
-  // Dispatch beforeunload now so terminal buffers are captured while panes are
-  // still mounted; update installs later bypass the ordinary close sequence.
-  window.dispatchEvent(new Event('beforeunload'))
 }
 
 const onNativeFileDrop = (_event: Electron.IpcRendererEvent, data: NativeFileDropPayload): void => {
@@ -468,9 +417,20 @@ const api = {
     getIdentity: (): Promise<AppIdentity> => ipcRenderer.invoke('app:getIdentity'),
     getFeatureWallAssetBaseUrl: (): Promise<string> =>
       ipcRenderer.invoke('app:getFeatureWallAssetBaseUrl'),
-    relaunch: (): Promise<void> => ipcRenderer.invoke('app:relaunch'),
+    relaunch: async (): Promise<void> => {
+      await prepareRendererForAppRestart(window, {
+        startedEventName: ORCA_APP_RESTART_STARTED_EVENT,
+        abortedEventName: ORCA_APP_RESTART_ABORTED_EVENT
+      })
+      try {
+        return await ipcRenderer.invoke('app:relaunch')
+      } catch (error) {
+        window.dispatchEvent(new Event(ORCA_APP_RESTART_ABORTED_EVENT))
+        throw error
+      }
+    },
     restart: async (): Promise<void> => {
-      await prepareRendererForAppRestart({
+      await prepareRendererForAppRestart(window, {
         startedEventName: ORCA_APP_RESTART_STARTED_EVENT,
         abortedEventName: ORCA_APP_RESTART_ABORTED_EVENT
       })
@@ -482,6 +442,16 @@ const api = {
       }
     },
     reload: (): Promise<void> => ipcRenderer.invoke('app:reload'),
+    persistBeforeUnloadSync: (
+      args: Parameters<PreloadApi['app']['persistBeforeUnloadSync']>[0]
+    ): void => {
+      const result = ipcRenderer.sendSync('app:persist-before-unload-sync', args) as {
+        ok?: unknown
+      }
+      if (result?.ok !== true) {
+        throw new Error('Failed to persist renderer state before unload.')
+      }
+    },
     awaitFirstWindowStartupServices: (): Promise<void> =>
       ipcRenderer.invoke('app:awaitFirstWindowStartupServices'),
     startupDiagnostic: (event: string, details?: Record<string, unknown>): Promise<void> =>
@@ -2734,7 +2704,7 @@ const api = {
     download: () => ipcRenderer.invoke('updater:download'),
     dismissNudge: () => ipcRenderer.invoke('updater:dismissNudge'),
     quitAndInstall: async (): Promise<void> => {
-      await prepareRendererForAppRestart({
+      await prepareRendererForAppRestart(window, {
         startedEventName: ORCA_UPDATER_QUIT_AND_INSTALL_STARTED_EVENT,
         abortedEventName: ORCA_UPDATER_QUIT_AND_INSTALL_ABORTED_EVENT
       })

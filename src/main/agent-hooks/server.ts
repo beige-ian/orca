@@ -59,7 +59,10 @@ import {
 } from '../../shared/agent-interrupt-intent'
 import { parseLegacyNumericPaneKey, parsePaneKey } from '../../shared/stable-pane-id'
 import type { LegacyPaneKeyAliasEntry } from '../../shared/types'
-import { normalizeAgentProviderSession } from '../../shared/agent-session-resume'
+import {
+  isResumableTuiAgent,
+  normalizeAgentProviderSession
+} from '../../shared/agent-session-resume'
 import { isCommandCodeNewTurnWhileWorking } from '../../shared/command-code-turn-boundary'
 
 export type { AgentHookSource }
@@ -299,6 +302,45 @@ function equivalentParsedAgentStatusPayload(
     a.lastAssistantMessage === b.lastAssistantMessage &&
     a.interrupted === b.interrupted
   )
+}
+
+function hasResumableProviderSession(entry: EnrichedAgentHookEventPayload | undefined): boolean {
+  return Boolean(
+    entry &&
+    entry.payload.state !== 'done' &&
+    isResumableTuiAgent(entry.payload.agentType) &&
+    entry.providerSession
+  )
+}
+
+function providerSessionsEqual(
+  left: EnrichedAgentHookEventPayload | undefined,
+  right: EnrichedAgentHookEventPayload | undefined
+): boolean {
+  if (!left?.providerSession || !right?.providerSession) {
+    return left?.providerSession === right?.providerSession
+  }
+  return (
+    left.providerSession.key === right.providerSession.key &&
+    left.providerSession.id === right.providerSession.id &&
+    left.providerSession.transcriptPath === right.providerSession.transcriptPath
+  )
+}
+
+function needsImmediateResumableStatusCheckpoint(
+  previous: EnrichedAgentHookEventPayload | undefined,
+  next: EnrichedAgentHookEventPayload
+): boolean {
+  // The first live provider session ID is the only durable fact that can
+  // reconstruct a session after both Electron and the PTY daemon disappear.
+  // Persist it before the normal 250ms trailing debounce closes the window.
+  if (hasResumableProviderSession(next)) {
+    return !hasResumableProviderSession(previous) || !providerSessionsEqual(previous, next)
+  }
+  // A Stop event must synchronously replace a previously persisted working
+  // row; otherwise an abrupt exit in this tiny interval could relaunch a turn
+  // that the provider has already completed.
+  return next.payload.state === 'done' && hasResumableProviderSession(previous)
 }
 
 function trackEmptyPaneKeyHook(body: unknown): void {
@@ -868,7 +910,14 @@ export class AgentHookServer {
     const enriched = this.attachStatusTiming(effectivePayload, now)
     this.runtimeObservedStatusPaneKeys.add(enriched.paneKey)
     this.state.lastStatusByPaneKey.set(enriched.paneKey, enriched)
-    this.scheduleStatusPersist()
+    if (needsImmediateResumableStatusCheckpoint(previous, enriched)) {
+      this.flushStatusPersistSync()
+      // Why: the sync write is fail-open; leave the normal trailing retry armed
+      // so a transient filesystem error still gets another attempt.
+      this.scheduleStatusPersist()
+    } else {
+      this.scheduleStatusPersist()
+    }
     this.notifyStatusChangeListeners()
     this.onAgentStatus?.(enriched)
     return enriched

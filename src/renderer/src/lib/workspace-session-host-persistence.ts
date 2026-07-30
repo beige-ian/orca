@@ -33,6 +33,11 @@ type SessionApi = {
   setSync: (args: WorkspaceSessionState, hostId?: ExecutionHostId) => void
 }
 
+export type WorkspaceSessionHostSnapshot = {
+  state: WorkspaceSessionState
+  hostId?: ExecutionHostId
+}
+
 export type WorkspaceSessionHostRead = {
   session: WorkspaceSessionState
   runtimeHostIdByWorkspaceSessionKey: Record<string, ExecutionHostId>
@@ -229,11 +234,21 @@ export function persistWorkspaceSessionByHostSync(
   payload: WorkspaceSessionState,
   state: HostPersistenceState
 ): void {
-  const slices = splitWorkspaceSessionByHost(payload, buildHostIdByWorktreeId(state))
-  api.setSync(slices[LOCAL_EXECUTION_HOST_ID] ?? payload)
-  for (const [hostId, slice] of nonLocalEntries(slices)) {
-    api.setSync(slice, hostId)
+  for (const snapshot of buildWorkspaceSessionHostSnapshots(payload, state)) {
+    api.setSync(snapshot.state, snapshot.hostId)
   }
+}
+
+/** Build the complete host-partitioned snapshot for one durable shutdown write. */
+export function buildWorkspaceSessionHostSnapshots(
+  payload: WorkspaceSessionState,
+  state: HostPersistenceState
+): WorkspaceSessionHostSnapshot[] {
+  const slices = splitWorkspaceSessionByHost(payload, buildHostIdByWorktreeId(state))
+  return [
+    { state: slices[LOCAL_EXECUTION_HOST_ID] ?? payload },
+    ...nonLocalEntries(slices).map(([hostId, hostState]) => ({ state: hostState, hostId }))
+  ]
 }
 
 /** Collect the distinct runtime hosts owning any persisted repo. */

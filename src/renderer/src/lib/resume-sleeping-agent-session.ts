@@ -144,6 +144,9 @@ export function resumeSleepingAgentSessionsForWorktree(
   worktreeId: string,
   options?: ResumeSleepingAgentSessionsOptions
 ): number {
+  if (options?.allowAutomaticResume === false) {
+    return 0
+  }
   const state = useAppStore.getState()
   const worktreeRecords = Object.values(state.sleepingAgentSessionsByPaneKey)
     .filter((record) => record.worktreeId === worktreeId)

@@ -20,6 +20,7 @@ import {
   resolveFloatingTerminalCwd
 } from './floating-workspace-directory'
 import { isMarkdownDocumentName, markdownDocumentFromFilePath } from './markdown-documents'
+import { registerRendererShutdownCheckpointHandler } from './renderer-shutdown-checkpoint'
 
 const KEYBOARD_INPUT_SOURCE_TIMEOUT_MS = 500
 const MAC_HITOOLBOX_DOMAIN = 'com.apple.HIToolbox'
@@ -35,6 +36,7 @@ const MAC_SELECTED_INPUT_SOURCES_JSON_COMMAND = [
 
 type RegisterAppHandlersOptions = {
   onBeforeRelaunch?: () => void | Promise<void>
+  trustedRendererWebContentsId?: number | null
 }
 
 async function pickFloatingMarkdownDocument(
@@ -252,6 +254,7 @@ async function readKeyboardInputSourceId(): Promise<string | null> {
 }
 
 export function registerAppHandlers(store: Store, options: RegisterAppHandlersOptions = {}): void {
+  registerRendererShutdownCheckpointHandler(store, options.trustedRendererWebContentsId ?? null)
   ipcMain.handle('app:getFeatureWallAssetBaseUrl', (): string => getFeatureWallAssetBaseUrl())
 
   ipcMain.handle('app:getIdentity', (): AppIdentity => {

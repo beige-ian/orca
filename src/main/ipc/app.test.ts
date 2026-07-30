@@ -79,6 +79,10 @@ vi.mock('electron', () => ({
   ipcMain: {
     handle: vi.fn((channel: string, handler: (_event: unknown, args?: unknown) => unknown) => {
       handlers.set(channel, handler)
+    }),
+    removeAllListeners: vi.fn(),
+    on: vi.fn((channel: string, handler: (_event: unknown, args?: unknown) => unknown) => {
+      handlers.set(channel, handler)
     })
   }
 }))

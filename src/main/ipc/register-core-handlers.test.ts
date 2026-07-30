@@ -45,6 +45,7 @@ const {
   registerBrowserHandlersMock,
   setAgentBrowserBridgeRefMock,
   setTrustedBrowserRendererWebContentsIdMock,
+  setTrustedRendererShutdownCheckpointWebContentsIdMock,
   registerFilesystemWatcherHandlersMock,
   registerAppHandlersMock,
   registerLinearHandlersMock,
@@ -106,6 +107,7 @@ const {
   registerBrowserHandlersMock: vi.fn(),
   setAgentBrowserBridgeRefMock: vi.fn(),
   setTrustedBrowserRendererWebContentsIdMock: vi.fn(),
+  setTrustedRendererShutdownCheckpointWebContentsIdMock: vi.fn(),
   registerFilesystemWatcherHandlersMock: vi.fn(),
   registerAppHandlersMock: vi.fn(),
   registerLinearHandlersMock: vi.fn(),
@@ -334,6 +336,11 @@ vi.mock('./app', () => ({
   registerAppHandlers: registerAppHandlersMock
 }))
 
+vi.mock('./renderer-shutdown-checkpoint', () => ({
+  setTrustedRendererShutdownCheckpointWebContentsId:
+    setTrustedRendererShutdownCheckpointWebContentsIdMock
+}))
+
 vi.mock('./linear', () => ({
   registerLinearHandlers: registerLinearHandlersMock
 }))
@@ -403,6 +410,7 @@ describe('registerCoreHandlers', () => {
     registerBrowserHandlersMock.mockReset()
     setAgentBrowserBridgeRefMock.mockReset()
     setTrustedBrowserRendererWebContentsIdMock.mockReset()
+    setTrustedRendererShutdownCheckpointWebContentsIdMock.mockReset()
     registerFilesystemWatcherHandlersMock.mockReset()
     registerAppHandlersMock.mockReset()
     registerLinearHandlersMock.mockReset()
@@ -464,7 +472,10 @@ describe('registerCoreHandlers', () => {
     expect(registerClaudeUsageHandlersMock).toHaveBeenCalledWith(claudeUsage)
     expect(registerCodexUsageHandlersMock).toHaveBeenCalledWith(codexUsage)
     expect(registerOpenCodeUsageHandlersMock).toHaveBeenCalledWith(openCodeUsage)
-    expect(registerAppHandlersMock).toHaveBeenCalledWith(store, { onBeforeRelaunch })
+    expect(registerAppHandlersMock).toHaveBeenCalledWith(store, {
+      onBeforeRelaunch,
+      trustedRendererWebContentsId: null
+    })
     expect(registerCodexAccountHandlersMock).toHaveBeenCalledWith(codexAccounts)
     expect(registerAgentHookHandlersMock).toHaveBeenCalledWith(runtime, {
       getPtyIdForPaneKey: expect.any(Function)
@@ -518,6 +529,7 @@ describe('registerCoreHandlers', () => {
     expect(setTrustedBrowserRendererWebContentsIdMock).toHaveBeenCalledWith(null)
     expect(setTrustedClipboardRendererWebContentsIdMock).toHaveBeenCalledWith(null)
     expect(setTrustedUIRendererWebContentsIdMock).toHaveBeenCalledWith(null)
+    expect(setTrustedRendererShutdownCheckpointWebContentsIdMock).toHaveBeenCalledWith(null)
     expect(registerBrowserHandlersMock).toHaveBeenCalled()
     expect(registerFilesystemWatcherHandlersMock).toHaveBeenCalled()
     expect(registerSpeechHandlersMock).toHaveBeenCalledWith(store)
@@ -587,6 +599,7 @@ describe('registerCoreHandlers', () => {
     expect(setTrustedBrowserRendererWebContentsIdMock).toHaveBeenCalledWith(42)
     expect(setTrustedClipboardRendererWebContentsIdMock).toHaveBeenCalledWith(42)
     expect(setTrustedUIRendererWebContentsIdMock).toHaveBeenCalledWith(42)
+    expect(setTrustedRendererShutdownCheckpointWebContentsIdMock).toHaveBeenCalledWith(42)
     // IPC handlers should NOT be registered again
     expect(registerCliHandlersMock).not.toHaveBeenCalled()
     expect(registerPreflightHandlersMock).not.toHaveBeenCalled()

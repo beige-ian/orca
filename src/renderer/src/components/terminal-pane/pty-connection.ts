@@ -120,7 +120,11 @@ import {
   enforceTerminalWriteScrollIntent
 } from '@/lib/pane-manager/terminal-scroll-intent'
 import { createBrowserUuid } from '@/lib/browser-uuid'
-import { makePaneKey, parseLegacyNumericPaneKey } from '../../../../shared/stable-pane-id'
+import {
+  makePaneKey,
+  parseLegacyNumericPaneKey,
+  parsePaneKey
+} from '../../../../shared/stable-pane-id'
 import {
   getProviderSessionClaimKey,
   isPassiveCompletedHibernationEvidence
@@ -1095,7 +1099,27 @@ export function connectPanePty(
           : oldestLegacyMatch
         : null)
     if (!selectedLegacyMatch) {
-      return null
+      // A crash can remove the persisted terminal layout before the workspace
+      // session is written. On the next launch the tab gets a new stable leaf
+      // UUID, while the live hook cache still points at the old UUID. When
+      // exactly one stable record belongs to this tab/worktree, it is safe to
+      // adopt it; multiple records remain ambiguous and must not be resumed in
+      // the wrong pane.
+      const rebuiltLeafMatches = Object.entries(state.sleepingAgentSessionsByPaneKey).filter(
+        ([paneKey, record]) => {
+          const parsed = parsePaneKey(paneKey)
+          return (
+            parsed?.tabId === deps.tabId &&
+            record.worktreeId === deps.worktreeId &&
+            (!record.tabId || record.tabId === deps.tabId)
+          )
+        }
+      )
+      if (rebuiltLeafMatches.length !== 1) {
+        return null
+      }
+      const [paneKey, record] = rebuiltLeafMatches[0]
+      return { paneKey, record }
     }
     const [paneKey, record] = selectedLegacyMatch
     return { paneKey, record }

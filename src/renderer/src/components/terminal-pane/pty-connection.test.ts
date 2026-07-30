@@ -7686,6 +7686,77 @@ describe('connectPanePty', () => {
     expect(mockStoreState.clearSleepingAgentSession).toHaveBeenCalledWith(paneKey)
   })
 
+  it('matches a unique sleeping session when a crash rebuilt the tab with a new leaf key', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const spawn = createDeferred<string>()
+    const transport = createMockTransport()
+    transport.connect.mockImplementation(() => spawn.promise)
+    transportFactoryQueue.push(transport)
+    const previousPaneKey = makePaneKey('tab-1', LEAF_1)
+    const rebuiltPaneKey = makePaneKey('tab-1', LEAF_2)
+    mockStoreState = {
+      ...mockStoreState,
+      tabsByWorktree: {
+        'wt-1': [{ id: 'tab-1', ptyId: null }]
+      },
+      ptyIdsByTabId: {
+        'tab-1': []
+      },
+      terminalLayoutsByTabId: {},
+      settings: {
+        ...mockStoreState.settings,
+        agentCmdOverrides: {}
+      },
+      agentStatusByPaneKey: {},
+      sleepingAgentSessionsByPaneKey: {
+        [previousPaneKey]: {
+          paneKey: previousPaneKey,
+          tabId: 'tab-1',
+          worktreeId: 'wt-1',
+          agent: 'codex',
+          providerSession: { key: 'session_id', id: 'codex-session-1' },
+          prompt: 'finish the task',
+          state: 'working',
+          capturedAt: 1,
+          updatedAt: 1
+        }
+      }
+    } as StoreState
+
+    const pane = createPane(2)
+    const manager = createManager(2)
+    const deps = createDeps({ restoredLeafId: undefined, restoredPtyIdByLeafId: {} })
+
+    connectPanePty(pane as never, manager as never, deps as never)
+    await flushAsyncTicks(4)
+
+    expect(transport.connect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: "codex '--dangerously-bypass-approvals-and-sandbox' 'resume' 'codex-session-1'",
+        launchAgent: 'codex',
+        env: expect.objectContaining({
+          ORCA_PANE_KEY: rebuiltPaneKey,
+          ORCA_TAB_ID: 'tab-1',
+          ORCA_WORKTREE_ID: 'wt-1'
+        })
+      })
+    )
+    expect(mockStoreState.registerAgentLaunchConfig).toHaveBeenCalledWith(
+      rebuiltPaneKey,
+      expect.anything(),
+      expect.objectContaining({
+        agentType: 'codex',
+        tabId: 'tab-1',
+        leafId: LEAF_2
+      })
+    )
+
+    spawn.resolve('fresh-pty')
+    await flushAsyncTicks(10)
+
+    expect(mockStoreState.clearSleepingAgentSession).toHaveBeenCalledWith(previousPaneKey)
+  })
+
   it('keeps sleeping resume record when fresh cold-restore spawn fails', async () => {
     const { connectPanePty } = await import('./pty-connection')
     const staleSessionId = 'wt-1@@stale-session'

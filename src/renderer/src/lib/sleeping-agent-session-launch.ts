@@ -14,6 +14,11 @@ import type { SleepingAgentSessionRecord } from '../../../shared/agent-session-r
 import { translate } from '@/i18n/i18n'
 
 export type ResumeSleepingAgentSessionsOptions = {
+  /**
+   * Startup hydration must not turn persisted provider sessions into fresh
+   * agent processes. Explicit workspace activation still opts in by omission.
+   */
+  allowAutomaticResume?: boolean
   suppressNavigation?: boolean
   /** Provider-session claim keys already woken in place by mounted panes
    *  (WAKE_HIBERNATED_AGENTS_WORKTREE_EVENT). Their sleeping records are
